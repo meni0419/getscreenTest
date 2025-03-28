@@ -1,76 +1,85 @@
 # fixtures/helpers.py
 import random
 import string
-import requests
-from typing import Optional
 from fixtures.credentials import BASE_URL, HEADERS, CAPTCHA_TYPE
-import requests
-from bs4 import BeautifulSoup
 from requests.exceptions import RequestException
 import logging
+import json
+import requests
+from colorama import Fore, Style
 
 
-def login(login: str, password: str) -> Optional[str]:
-    """Аутентификация с динамическим токеном и полными заголовками"""
+def login(login: str, password: str, return_full: bool = False):
+    """Аутентификация с обработкой ошибок подключения"""
     url = f"{BASE_URL}/login"
-
     payload = {
         "login": login,
         "password": password,
         "captcha_type": CAPTCHA_TYPE
     }
 
-    # Полный набор заголовков из примера запроса
     full_headers = {
         **HEADERS,
         "Origin": "https://getscreen.dev",
         "Referer": "https://getscreen.dev/login",
-        "X-Requested-With": "XMLHttpRequest",
-        "Sec-Fetch-Dest": "empty",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "same-origin"
+        "X-Requested-With": "XMLHttpRequest"
     }
 
     try:
-        with requests.Session() as session:
-            # Первый запрос для получения CSRF-токена (если требуется)
-            session.get("https://getscreen.dev/login")
+        session = requests.Session()
+        # Добавляем таймаут для первого запроса
+        session.get("https://getscreen.dev/login", timeout=10)
 
-            # Основной запрос аутентификации
-            response = session.post(
-                url,
-                data=payload,
-                headers=full_headers,
-                allow_redirects=False
-            )
+        # Основной запрос с таймаутом
+        response = session.post(
+            url,
+            data=payload,
+            headers=full_headers,
+            allow_redirects=False,
+            timeout=10
+        )
 
-            # Проверка успешной аутентификации
-            if response.status_code == 200 and response.json().get("status") == 0:
-                return session.cookies.get("llt", domain=".getscreen.dev")
-
-            print(f"Auth failed. Response: {response.text}")
-            return None
+        # Всегда возвращаем валидные объекты запроса/ответа
+        cookie = session.cookies.get("llt", domain=".getscreen.dev") if response.ok else None
+        return (cookie, response.request, response) if return_full else cookie
 
     except Exception as e:
-        print(f"Authentication error: {str(e)}")
-        return None
+        logging.error(f"Critical login error: {str(e)}")
+        # Создаем заглушки для объектов запроса/ответа
+        dummy_request = requests.Request('POST', url)
+        return (None, dummy_request, None) if return_full else None
 
 
-# fixtures/helpers.py
+def get_profile(auth_cookie: str, return_full: bool = False):
+    """Получение профиля с возможностью возврата полных данных"""
+    url = f"{BASE_URL}/dashboard/settings/account"
+    headers = {"Cookie": f"llt={auth_cookie}"}
+
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+    except (RequestException, ValueError) as e:
+        data = {}
+        response = getattr(e, "response", None)
+
+    if return_full:
+        return data, response.request, response
+    return data
+
+
 def update_profile(name: str, surname: str, auth_cookie: str) -> requests.Response:
     """Обновление профиля с полными заголовками и сессией"""
     url = f"{BASE_URL}/dashboard/settings/account/update"
 
-    # Используем сессию для сохранения cookies
     with requests.Session() as session:
         session.cookies.update({"llt": auth_cookie})
 
         headers = {
-            "Content-Type": "application/json",
+            **HEADERS,  # Используем базовые заголовки
             "Referer": f"{BASE_URL}/dashboard/settings/account",
             "Origin": BASE_URL,
-            "X-Requested-With": "XMLHttpRequest",
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
+            "X-Requested-With": "XMLHttpRequest"
         }
 
         payload = {
@@ -84,23 +93,13 @@ def update_profile(name: str, surname: str, auth_cookie: str) -> requests.Respon
             "timezone": 0
         }
 
-        # Добавляем все cookies из браузера (пример)
-        session.cookies.update({
-            "lang": "en",
-            "cc_cookie": "..."
-        })
-
-        response = session.post(url, json=payload, headers=headers)
+        # Явно сериализуем в JSON и устанавливаем правильный Content-Type
+        response = session.post(
+            url,
+            json=payload,
+            headers=headers
+        )
         return response
-
-
-def get_profile(auth_cookie: str) -> dict:
-    """Получение профиля с проверкой статуса"""
-    url = f"{BASE_URL}/dashboard/settings/account"
-    headers = {"Cookie": f"llt={auth_cookie}"}
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
-    return response.json()
 
 
 def generate_random_name(length: int = 8) -> str:
@@ -117,33 +116,30 @@ def pretty_print(step_name, request, response, success_message, error_message):
     separator = "=" * 30
     print(f"{Fore.BLUE}{separator} Шаг: {step_name} {separator}{Style.RESET_ALL}\n")
 
-    # Request details
+    # Request details с проверкой на None
     print(f"{Fore.YELLOW}{separator} Request Details {separator}{Style.RESET_ALL}")
-    print(f"{Fore.CYAN}URL: {Style.RESET_ALL}{request.url}")
-    print(f"{Fore.CYAN}Method: {Style.RESET_ALL}{request.method}")
-    print(f"{Fore.CYAN}Headers: {Style.RESET_ALL}{request.headers}")
-    if request.body:
+    if request:
+        print(f"{Fore.CYAN}URL: {Style.RESET_ALL}{getattr(request, 'url', 'N/A')}")
+        print(f"{Fore.CYAN}Method: {Style.RESET_ALL}{getattr(request, 'method', 'N/A')}")
+        print(f"{Fore.CYAN}Headers: {Style.RESET_ALL}{dict(getattr(request, 'headers', {}))}")
+    else:
+        print(f"{Fore.RED}Request object is missing{Style.RESET_ALL}")
+
+    # Response details с проверкой на None
+    print(f"\n{Fore.YELLOW}{separator} Response Details {separator}{Style.RESET_ALL}")
+    if response:
+        print(f"{Fore.MAGENTA}Status Code: {Style.RESET_ALL}{getattr(response, 'status_code', 'N/A')}")
         try:
-            body = json.loads(request.body) if isinstance(request.body, str) else request.body
-            pretty_body = json.dumps(body, indent=2, ensure_ascii=False)
-            print(f"{Fore.CYAN}Body: {Style.RESET_ALL}{pretty_body}")
-        except json.JSONDecodeError:
-            print(f"{Fore.CYAN}Body: {Style.RESET_ALL}{request.body}")
-
-    print()
-
-    # Response details
-    print(f"{Fore.YELLOW}{separator} Response Details {separator}{Style.RESET_ALL}")
-    print(f"{Fore.MAGENTA}Status Code: {Style.RESET_ALL}{response.status_code}")
-    try:
-        response_content = response.json()
-        pretty_response = json.dumps(response_content, indent=2, ensure_ascii=False)
-    except (ValueError, json.JSONDecodeError):
-        pretty_response = response.text
-    print(f"{Fore.MAGENTA}Response: {Style.RESET_ALL}{pretty_response}\n")
+            response_content = response.json()
+            pretty_response = json.dumps(response_content, indent=2, ensure_ascii=False)
+        except:
+            pretty_response = getattr(response, 'text', 'Empty response')
+        print(f"{Fore.MAGENTA}Response: {Style.RESET_ALL}{pretty_response}")
+    else:
+        print(f"{Fore.RED}Response object is missing{Style.RESET_ALL}")
 
     # Status message
-    if response.status_code == 200:
-        print(f"{Fore.GREEN}[Succeed]{Style.RESET_ALL} {success_message}\n")
+    if response and response.status_code == 200:
+        print(f"\n{Fore.GREEN}[Succeed]{Style.RESET_ALL} {success_message}")
     else:
-        print(f"{Fore.RED}[Failed]{Style.RESET_ALL} {error_message}\n")
+        print(f"\n{Fore.RED}[Failed]{Style.RESET_ALL} {error_message}")
