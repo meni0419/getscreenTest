@@ -1,6 +1,6 @@
 import random
 import string
-from fixtures.credentials import BASE_URL, HEADERS, CAPTCHA_TYPE
+from src.fixtures.credentials import BASE_URL, HEADERS, CAPTCHA_TYPE
 from requests.exceptions import RequestException
 import logging
 import requests

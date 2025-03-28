@@ -1,6 +1,6 @@
 import pytest
-from fixtures.helpers import login, update_profile, get_profile, generate_random_name, pretty_print
-from fixtures.credentials import LOGIN, PASSWORD
+from src.fixtures.helpers import login, update_profile, get_profile, generate_random_name, pretty_print
+from src.fixtures.credentials import LOGIN, PASSWORD
 
 
 @pytest.fixture(scope="session")
