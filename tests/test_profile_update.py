@@ -32,10 +32,7 @@ def test_profile_update_flow(auth_cookie):
 
     # ШАГ 1: Обновление профиля
     update_response = update_profile(test_data["name"], test_data["surname"], auth_cookie)
-
-    # Явная проверка перед pretty_print
     assert update_response.status_code == 200, f"Update failed: {update_response.text}"
-
     pretty_print(
         "Обновление профиля",
         update_response.request,
@@ -47,8 +44,14 @@ def test_profile_update_flow(auth_cookie):
     sleep(0.5)
 
     # ШАГ 2: Проверка изменений
-    profile_data = get_profile(auth_cookie)
+    profile_data, profile_req, profile_resp = get_profile(auth_cookie, return_full=True)
+    pretty_print(
+        "Проверка данных профиля",
+        profile_req,
+        profile_resp,
+        "Данные профиля получены!",
+        "Ошибка получения данных!"
+    )
 
-    # Основные проверки
     assert profile_data["name"] == test_data["name"], "Имя не совпадает"
     assert profile_data["surname"] == test_data["surname"], "Фамилия не совпадает"

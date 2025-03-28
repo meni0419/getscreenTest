@@ -114,32 +114,41 @@ import json
 
 def pretty_print(step_name, request, response, success_message, error_message):
     separator = "=" * 30
-    print(f"{Fore.BLUE}{separator} Шаг: {step_name} {separator}{Style.RESET_ALL}\n")
+    # Добавляем перенос строки перед заголовком шага
+    print(f"\n{Fore.BLUE}{separator} Шаг: {step_name} {separator}{Style.RESET_ALL}\n")
 
-    # Request details с проверкой на None
-    print(f"{Fore.YELLOW}{separator} Request Details {separator}{Style.RESET_ALL}")
+    # Детали запроса
+    print(f"{Fore.YELLOW}{separator} Детали запроса {separator}{Style.RESET_ALL}")
     if request:
-        print(f"{Fore.CYAN}URL: {Style.RESET_ALL}{getattr(request, 'url', 'N/A')}")
-        print(f"{Fore.CYAN}Method: {Style.RESET_ALL}{getattr(request, 'method', 'N/A')}")
-        print(f"{Fore.CYAN}Headers: {Style.RESET_ALL}{dict(getattr(request, 'headers', {}))}")
+        print(f"{Fore.CYAN}URL: {Style.RESET_ALL}{request.url}")
+        print(f"{Fore.CYAN}Method: {Style.RESET_ALL}{request.method}")
+        print(f"{Fore.CYAN}Headers: {Style.RESET_ALL}{dict(request.headers)}")
+        if request.body:
+            try:
+                body = request.body.decode("utf-8") if isinstance(request.body, bytes) else request.body
+                parsed_body = json.loads(body)
+                pretty_body = json.dumps(parsed_body, indent=2, ensure_ascii=False)
+                print(f"{Fore.CYAN}Body: {Style.RESET_ALL}{pretty_body}")
+            except Exception:
+                print(f"{Fore.CYAN}Body: {Style.RESET_ALL}{body}")
     else:
-        print(f"{Fore.RED}Request object is missing{Style.RESET_ALL}")
+        print(f"{Fore.RED}Объект запроса отсутствует{Style.RESET_ALL}")
 
-    # Response details с проверкой на None
-    print(f"\n{Fore.YELLOW}{separator} Response Details {separator}{Style.RESET_ALL}")
+    # Детали ответа
+    print(f"\n{Fore.YELLOW}{separator} Детали ответа {separator}{Style.RESET_ALL}")
     if response:
-        print(f"{Fore.MAGENTA}Status Code: {Style.RESET_ALL}{getattr(response, 'status_code', 'N/A')}")
+        print(f"{Fore.MAGENTA}Status code: {Style.RESET_ALL}{response.status_code}")
         try:
-            response_content = response.json()
-            pretty_response = json.dumps(response_content, indent=2, ensure_ascii=False)
-        except:
-            pretty_response = getattr(response, 'text', 'Empty response')
-        print(f"{Fore.MAGENTA}Response: {Style.RESET_ALL}{pretty_response}")
+            response_json = response.json()
+            pretty_response = json.dumps(response_json, indent=2, ensure_ascii=False)
+            print(f"{Fore.MAGENTA}Response: {Style.RESET_ALL}{pretty_response}")
+        except Exception:
+            print(f"{Fore.MAGENTA}Response: {Style.RESET_ALL}{response.text}")
     else:
-        print(f"{Fore.RED}Response object is missing{Style.RESET_ALL}")
+        print(f"{Fore.RED}Объект ответа отсутствует{Style.RESET_ALL}")
 
-    # Status message
+    # Статусное сообщение
     if response and response.status_code == 200:
-        print(f"\n{Fore.GREEN}[Succeed]{Style.RESET_ALL} {success_message}")
+        print(f"\n{Fore.GREEN}[Succeed]{Style.RESET_ALL} {success_message}\n")
     else:
-        print(f"\n{Fore.RED}[Failed]{Style.RESET_ALL} {error_message}")
+        print(f"\n{Fore.RED}[Failed]{Style.RESET_ALL} {error_message}\n")
