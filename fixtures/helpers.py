@@ -1,12 +1,9 @@
-# fixtures/helpers.py
 import random
 import string
 from fixtures.credentials import BASE_URL, HEADERS, CAPTCHA_TYPE
 from requests.exceptions import RequestException
 import logging
-import json
 import requests
-from colorama import Fore, Style
 
 
 def login(login: str, password: str, return_full: bool = False):
@@ -112,43 +109,38 @@ from colorama import Fore, Style
 import json
 
 
+# helpers.py (измененная функция pretty_print)
 def pretty_print(step_name, request, response, success_message, error_message):
+    """Полная версия с детализацией"""
     separator = "=" * 30
-    # Добавляем перенос строки перед заголовком шага
     print(f"\n{Fore.BLUE}{separator} Шаг: {step_name} {separator}{Style.RESET_ALL}\n")
 
     # Детали запроса
     print(f"{Fore.YELLOW}{separator} Детали запроса {separator}{Style.RESET_ALL}")
     if request:
-        print(f"{Fore.CYAN}URL: {Style.RESET_ALL}{request.url}")
-        print(f"{Fore.CYAN}Method: {Style.RESET_ALL}{request.method}")
-        print(f"{Fore.CYAN}Headers: {Style.RESET_ALL}{dict(request.headers)}")
+        print(f"{Fore.CYAN}URL:{Style.RESET_ALL} {request.url}")
+        print(f"{Fore.CYAN}Method:{Style.RESET_ALL} {request.method}")
+        print(f"{Fore.CYAN}Headers:{Style.RESET_ALL} {dict(request.headers)}")
         if request.body:
             try:
-                body = request.body.decode("utf-8") if isinstance(request.body, bytes) else request.body
-                parsed_body = json.loads(body)
-                pretty_body = json.dumps(parsed_body, indent=2, ensure_ascii=False)
-                print(f"{Fore.CYAN}Body: {Style.RESET_ALL}{pretty_body}")
-            except Exception:
-                print(f"{Fore.CYAN}Body: {Style.RESET_ALL}{body}")
+                body = request.body.decode('utf-8') if isinstance(request.body, bytes) else request.body
+                print(f"{Fore.CYAN}Body:{Style.RESET_ALL}\n{json.dumps(json.loads(body), indent=2)}")
+            except:
+                print(f"{Fore.CYAN}Body:{Style.RESET_ALL} {body}")
     else:
-        print(f"{Fore.RED}Объект запроса отсутствует{Style.RESET_ALL}")
+        print(f"{Fore.RED}Запрос отсутствует{Style.RESET_ALL}")
 
     # Детали ответа
     print(f"\n{Fore.YELLOW}{separator} Детали ответа {separator}{Style.RESET_ALL}")
     if response:
-        print(f"{Fore.MAGENTA}Status code: {Style.RESET_ALL}{response.status_code}")
+        print(f"{Fore.CYAN}Status:{Style.RESET_ALL} {response.status_code}")
         try:
-            response_json = response.json()
-            pretty_response = json.dumps(response_json, indent=2, ensure_ascii=False)
-            print(f"{Fore.MAGENTA}Response: {Style.RESET_ALL}{pretty_response}")
-        except Exception:
-            print(f"{Fore.MAGENTA}Response: {Style.RESET_ALL}{response.text}")
+            print(f"{Fore.CYAN}Response:{Style.RESET_ALL}\n{json.dumps(response.json(), indent=2)}")
+        except:
+            print(f"{Fore.CYAN}Response:{Style.RESET_ALL} {response.text}")
     else:
-        print(f"{Fore.RED}Объект ответа отсутствует{Style.RESET_ALL}")
+        print(f"{Fore.RED}Ответ отсутствует{Style.RESET_ALL}")
 
-    # Статусное сообщение
-    if response and response.status_code == 200:
-        print(f"\n{Fore.GREEN}[Succeed]{Style.RESET_ALL} {success_message}\n")
-    else:
-        print(f"\n{Fore.RED}[Failed]{Style.RESET_ALL} {error_message}\n")
+    # Статус
+    status_icon = f"{Fore.GREEN}[Success]" if success_message else f"{Fore.RED}[Failed]"
+    print(f"\n{status_icon} {success_message or error_message}{Style.RESET_ALL}\n")

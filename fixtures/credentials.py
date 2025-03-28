@@ -1,4 +1,3 @@
-# fixtures/credentials.py
 LOGIN = "meni04192@gmail.com"
 PASSWORD = "EFgB2fNrnE"
 BASE_URL = "https://getscreen.dev/api"
